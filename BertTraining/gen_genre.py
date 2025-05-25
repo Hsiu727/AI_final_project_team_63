@@ -18,7 +18,7 @@ if os.path.exists(raw_data_dir):
     print('Output path {} already exists!'.format(raw_data_dir))
     sys.exit(0)
 data_path = input('LMD dataset zip path: ')
-n_folds = 5 # //////////////////////////////////////////////////////////temp, it was 5
+n_folds = 2 # //////////////////////////////////////////////////////////temp, it was 5
 n_times = 4  # sample train set multiple times
 max_length = int(input('sequence length: '))
 preprocess.sample_len_max = max_length
