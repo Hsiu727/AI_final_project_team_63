@@ -18,7 +18,7 @@ if os.path.exists(raw_data_dir):
     print('Output path {} already exists!'.format(raw_data_dir))
     sys.exit(0)
 data_path = input('LMD dataset zip path: ')
-n_folds = 5
+n_folds = 5 # //////////////////////////////////////////////////////////temp, it was 5
 n_times = 4  # sample train set multiple times
 max_length = int(input('sequence length: '))
 preprocess.sample_len_max = max_length
@@ -31,7 +31,12 @@ pool_num = 24
 
 labels = dict()
 with open('midi_genre_map.json') as f:
-    for s in json.load(f)[subset].items():
+    genre_map = json.load(f)
+    if subset in genre_map:
+        subset_map = genre_map[subset]
+    else:
+        subset_map = genre_map
+    for s in subset_map.items():
         labels[s[0]] = tuple(
             sorted(set(i.strip().replace(' ', '-') for i in s[1])))
 
