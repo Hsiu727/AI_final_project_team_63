@@ -2,7 +2,7 @@ import torch
 from model import MultiTaskMIDICNN
 from utils import midi_to_pianoroll
 
-def predict_emotion_genre_prob(filepath, model_path="midi_multitask_ckpt.pt", max_length=500):
+def predict_emotion_genre_prob(filepath, model_path="midi_multitask_cnn_final.pt", max_length=500):
     ckpt = torch.load(model_path, map_location='cuda' if torch.cuda.is_available() else 'cpu')
     emotion2idx = ckpt['emotion2idx']
     genre2idx = ckpt['genre2idx']
