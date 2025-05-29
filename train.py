@@ -1,100 +1,81 @@
-# train.py
-import os
-import pickle
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
-from dataset import MusicDataset
-from collate_fn import music_collate_fn
 from model import CondTransformer
-from tqdm import tqdm
-from miditok import REMI
+from dataset import FullBandMusicDataset
+import pickle
+from tqdm import tqdm 
 
-# ------------------
-# Config & Hyperparams
-# ------------------
-DATA_PKL   = 'dataset.pkl'
-EMO_PKL    = 'emo2idx.pkl'
-GEN_PKL    = 'gen2idx.pkl'
-CHECKPOINT_DIR = 'checkpoints'
-os.makedirs(CHECKPOINT_DIR, exist_ok=True)
-
+# ----- 參數設定 -----
+DATASET_PATH = "dataset_fullband.pkl"
+EMO2IDX_PATH = "emo2idx.pkl"
+GEN2IDX_PATH = "gen2idx.pkl"
+TOKENIZER_PATH = "tokenizer.json"
 BATCH_SIZE = 16
-MAX_LEN    = 512
-LR         = 1e-3
-EPOCHS     = 10
-TOKENIZER_JSON = "tokenizer.json"
-DEVICE     = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+EPOCHS = 5
+MAX_LEN = 512
+PAD_TOKEN = 0
+LEARNING_RATE = 1e-4
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+CKPT_PATH = "best_model.pt"
 
-# ------------------
-# Load Data & Vocab
-# ------------------
-with open(DATA_PKL, 'rb') as f:
-    data = pickle.load(f)
-with open(EMO_PKL, 'rb') as f:
+# ----- 載入 tokenizer -----
+from miditok import REMI
+tokenizer = REMI(params=TOKENIZER_PATH)
+VOCAB_SIZE = tokenizer.vocab_size
+
+# ----- 資料集與 DataLoader -----
+train_dataset = FullBandMusicDataset(DATASET_PATH, EMO2IDX_PATH, GEN2IDX_PATH, max_len=MAX_LEN, pad_token=PAD_TOKEN)
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
+
+print(f"Train dataset size: {len(train_dataset)}")
+print(f"Train loader batch count: {len(train_loader)}")
+
+# ----- 模型 -----
+with open(EMO2IDX_PATH, "rb") as f:
     emo2idx = pickle.load(f)
-with open(GEN_PKL, 'rb') as f:
+with open(GEN2IDX_PATH, "rb") as f:
     gen2idx = pickle.load(f)
 
-# Determine vocab size from tokenizer saved params if available
-# For simplicity, user should set VOCAB_SIZE manually or load from tokenizer
-tokenizer = REMI(params=TOKENIZER_JSON) if TOKENIZER_JSON else REMI()
-VOCAB_SIZE = tokenizer.vocab_size if 'tokenizer' in globals() else 512  # update accordingly
-
-# ------------------
-# Dataset & Dataloader
-# ------------------
-train_dataset = MusicDataset(data, emo2idx, gen2idx, max_len=MAX_LEN, pad_token=0)
-train_loader  = DataLoader(
-    train_dataset,
-    batch_size=BATCH_SIZE,
-    shuffle=True,
-    collate_fn=music_collate_fn
-)
-
-# ------------------
-# Model, Optimizer, Loss
-# ------------------
 model = CondTransformer(
     vocab_size=VOCAB_SIZE,
+    d_model=256,
+    nlayers=6,
+    nhead=8,
     emo_num=len(emo2idx),
     gen_num=len(gen2idx),
-    d_model=256,
-    nhead=8,
-    nlayers=4,
-    max_seq_len=MAX_LEN
+    max_seq_len=MAX_LEN,
 ).to(DEVICE)
-optimizer = torch.optim.Adam(model.parameters(), lr=LR)
-loss_fn   = torch.nn.CrossEntropyLoss(ignore_index=0)
 
-# ------------------
-# Training Loop
-# ------------------
-for epoch in range(1, EPOCHS+1):
+optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+criterion = nn.CrossEntropyLoss(ignore_index=PAD_TOKEN)
+
+# ----- 訓練迴圈 -----
+best_loss = float("inf")
+for epoch in range(1, EPOCHS + 1):
     model.train()
-    total_loss = 0.0
-    for tokens, attn_mask, emo, gen, lengths in tqdm(train_loader, desc=f"Epoch {epoch}/{EPOCHS}"):
-        tokens = tokens.to(DEVICE)           # [B, L]
-        emo    = emo.to(DEVICE)              # [B]
-        gen    = gen.to(DEVICE)              # [B]
-        # Shift inputs and targets for auto-regressive training
-        inputs  = tokens[:, :-1]
+    total_loss = 0
+    # 加入 tqdm 進度條
+    pbar = tqdm(train_loader, desc=f"Epoch {epoch}/{EPOCHS}", dynamic_ncols=True)
+    for tokens, emos, gens, lengths in pbar:
+        tokens = tokens.to(DEVICE)
+        emos = emos.to(DEVICE)
+        gens = gens.to(DEVICE)
+        inputs = tokens[:, :-1]
         targets = tokens[:, 1:]
-        # Forward
-        logits = model(inputs, emo, gen)    # [B, L-1, vocab_size]
-        # Compute loss: flatten
-        loss = loss_fn(
-            logits.reshape(-1, logits.size(-1)),
-            targets.reshape(-1)
-        )
+        logits = model(inputs, emos, gens)
+        loss = criterion(logits.reshape(-1, VOCAB_SIZE), targets.reshape(-1))
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
+        pbar.set_postfix(loss=loss.item())
 
     avg_loss = total_loss / len(train_loader)
-    print(f"Epoch {epoch}/{EPOCHS} - Loss: {avg_loss:.4f}")
-    # Save checkpoint
-    ckpt_path = os.path.join(CHECKPOINT_DIR, f'epoch{epoch}.pt')
-    torch.save(model.state_dict(), ckpt_path)
+    print(f"[Epoch {epoch}] train loss: {avg_loss:.4f}")
 
-print("Training complete!")
+    # 儲存最佳模型
+    if avg_loss < best_loss:
+        best_loss = avg_loss
+        torch.save(model.state_dict(), CKPT_PATH)
+        print(f"  (Saved new best model to {CKPT_PATH})")

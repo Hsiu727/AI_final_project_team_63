@@ -1,62 +1,103 @@
 import os
-import re
 import pickle
-from miditok import REMI  # 你可以選用 CP, Octuple, MuMIDI, 但 REMI最常見
-import pretty_midi
+from miditok import REMI, TokenizerConfig
 
-# ----------- 1. 檔名解析 -------------
-def parse_emo_gen(filename):
-    # 支援 XMIDI_happy_country_G05AFQN7.midi
-    m = re.match(r'.*_(?P<emo>[A-Za-z]+)_(?P<gen>[A-Za-z]+)_', filename)
-    if not m:
-        raise ValueError(f"檔名 {filename} 不符 _emo_gen_ 格式")
-    return m.group('emo'), m.group('gen')
+data_dir = "large"
 
-# ----------- 2. miditok 設定 -------------
-# 指定你的 midi 檔資料夾
-DATA_DIR = 'mid'
-SAVE_PATH = 'dataset.pkl'
+TOKENIZER_PARAMS = {
+    "use_programs": True,
+    "one_token_stream_for_programs": True,
+    "use_time_signatures": True
+}
+config = TokenizerConfig(**TOKENIZER_PARAMS)
 
-# 初始化 tokenizer
-tokenizer = REMI()  # 參數可以自定義，有需要可參考 miditok 官網
-# 預設 config 足夠小專案測試，進階可再調
+tokenizer = REMI(config) 
 
-# ----------- 3. 開始處理 -------------
 dataset = []
-emos, gens = set(), set()
-for fn in os.listdir(DATA_DIR):
-    if not fn.lower().endswith(('.mid', '.midi')):
+emo2idx, gen2idx = {}, {}
+
+for fname in os.listdir(data_dir):
+    if not fname.lower().endswith('.midi'):
         continue
-    emo, gen = parse_emo_gen(fn)
-    midi_path = os.path.join(DATA_DIR, fn)
+    midi_path = os.path.join(data_dir, fname)
     try:
-        tokens = tokenizer(midi_path)
-        if isinstance(tokens, list):
-            # 多軌的話 tokens 是 list（每個樂器一條序列）
-            all_ids = []
-            for t in tokens:
-                all_ids.extend(t.ids)
-            int_tokens = all_ids
+        # 檔名解析
+        parts = fname.split('_')
+        if len(parts) < 4:
+            print(f"檔名 {fname} 解析失敗")
+            continue
+        _, emo, genre, _ = parts
+        emo2idx.setdefault(emo, len(emo2idx))
+        gen2idx.setdefault(genre, len(gen2idx))
+
+        token_objs = tokenizer(midi_path)
+        if not isinstance(token_objs, list):
+            token_objs = [token_objs]
+        tokens_obj = token_objs[0]
+        # robust 型態檢查
+        if hasattr(tokens_obj, "ids"):
+            tokens = tokens_obj.ids
+        elif isinstance(tokens_obj, int):
+            tokens = [tokens_obj]
         else:
-            int_tokens = tokens.ids
+            print(f"{fname}: 未知型態 {type(tokens_obj)}，跳過")
+            continue
+
+        dataset.append({
+            'tokens': tokens,
+            'emotion': emo,
+            'genre': genre,
+            'filename': fname
+        })
     except Exception as e:
-        print(f"[!] 處理 {fn} 失敗：{e}")
-        continue
-    dataset.append({'tokens': int_tokens, 'emotion': emo, 'genre': gen})
-    emos.add(emo)
-    gens.add(gen)
+        print(f"Error processing {fname}: {e}")
 
-# 儲存tokenizer
-tokenizer.save_params("tokenizer.json")
 
-# ----------- 4. 儲存處理後資料 -------------
-with open(SAVE_PATH, 'wb') as f:
-    pickle.dump(dataset, f)
+# ###########debug###########
+# print(f"\n共收集 {len(dataset)} 首歌")
+# print(f"情緒標籤: {emo2idx}")
+# print(f"類型標籤: {gen2idx}")
+# for i, song in enumerate(dataset[:3]):
+#     print(f"\n第{i+1}首：{song['filename']}")
+#     print("  tokens 數量 =", len(song['tokens']), "前10 tokens =", song['tokens'][:10])
+#     print(f"  標註 emotion = {song['emotion']}, genre = {song['genre']}")
 
-# ----------- 5. 儲存標籤列表 -------------
-with open('emo2idx.pkl', 'wb') as f:
-    pickle.dump({e: i for i, e in enumerate(sorted(emos))}, f)
-with open('gen2idx.pkl', 'wb') as f:
-    pickle.dump({g: i for i, g in enumerate(sorted(gens))}, f)
+#     print("前30個token對應事件：")
+#     for tid in dataset[0]['tokens'][:10]:
+#         print(tokenizer[tid])
 
-print(f"完成！共處理 {len(dataset)} 首曲子，情緒: {emos}，種類: {gens}")
+
+
+# # 儲存資料與標籤對應
+# with open("dataset_fullband.pkl", "wb") as f:
+#     pickle.dump(dataset, f)
+# with open("emo2idx.pkl", "wb") as f:
+#     pickle.dump(emo2idx, f)
+# with open("gen2idx.pkl", "wb") as f:
+#     pickle.dump(gen2idx, f)
+
+# # 儲存 tokenizer config
+# tokenizer.save_params("tokenizer.json")
+
+# for tid in tokens[:2000]:
+#     print(tokenizer[tid])
+
+
+# # 1. 載入 dataset
+# with open("dataset_fullband.pkl", "rb") as f:
+#     dataset = pickle.load(f)
+
+# # 2. 載入 tokenizer
+# tokenizer = REMI(params="tokenizer.json")
+
+# # 3. 選一首 sample（例如第一首）
+# tokens = dataset[0]['tokens']
+# print(f"tokens length: {len(tokens)}")
+
+# # 4. 解回 MIDI（注意 miditok v3.x 推薦傳入 list of list）
+# midi_obj = tokenizer(tokens)  # 這裡 tokens 要用 list of int
+
+# # 5. 輸出為 MIDI 檔案
+# midi_obj.dump_midi("test_sample_from_dataset.mid")
+# print("已輸出 test_sample_from_dataset.mid，請用 MIDI 軟體聽聽看！")
+###########debug###########

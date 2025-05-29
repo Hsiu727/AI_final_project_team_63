@@ -1,20 +1,16 @@
-# dataset.py
 import torch
 from torch.utils.data import Dataset
+import pickle
 
-class MusicDataset(Dataset):
-    """
-    用於條件式音樂生成的 PyTorch Dataset。
-    每筆資料包含:
-      - tokens: 音樂事件序列 (List[int])，自動裁剪或 padding 至 max_len
-      - emotion: 情緒標籤 index (int)
-      - genre: 種類標籤 index (int)
-      - length: 原始 token 長度 (int)，可用於 mask
-    """
-    def __init__(self, data, emo2idx, gen2idx, max_len=512, pad_token=0):
-        self.data = data
-        self.emo2idx = emo2idx
-        self.gen2idx = gen2idx
+class FullBandMusicDataset(Dataset):
+    def __init__(self, data_path, emo2idx_path, gen2idx_path, max_len=512, pad_token=0):
+        # 載入前處理好的資料
+        with open(data_path, "rb") as f:
+            self.data = pickle.load(f)
+        with open(emo2idx_path, "rb") as f:
+            self.emo2idx = pickle.load(f)
+        with open(gen2idx_path, "rb") as f:
+            self.gen2idx = pickle.load(f)
         self.max_len = max_len
         self.pad_token = pad_token
 
@@ -24,11 +20,12 @@ class MusicDataset(Dataset):
     def __getitem__(self, idx):
         item = self.data[idx]
         tokens = item['tokens']
-        # 裁剪或 padding
+        # truncate
         tokens = tokens[:self.max_len]
         length = len(tokens)
+        # pad if needed
         if length < self.max_len:
-            tokens = tokens + [self.pad_token] * (self.max_len - length)
+            tokens += [self.pad_token] * (self.max_len - length)
         emotion = self.emo2idx[item['emotion']]
         genre = self.gen2idx[item['genre']]
         return (
@@ -37,3 +34,19 @@ class MusicDataset(Dataset):
             torch.tensor(genre, dtype=torch.long),
             length
         )
+
+# 如果你要測試 DataLoader：
+if __name__ == "__main__":
+    from torch.utils.data import DataLoader
+    ds = FullBandMusicDataset(
+        "dataset_fullband.pkl", "emo2idx.pkl", "gen2idx.pkl",
+        max_len=512, pad_token=0
+    )
+    dl = DataLoader(ds, batch_size=8, shuffle=True)
+    for batch in dl:
+        tokens, emos, gens, lengths = batch
+        print("tokens:", tokens.shape)
+        print("emos:", emos)
+        print("gens:", gens)
+        print("lengths:", lengths)
+        break

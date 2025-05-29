@@ -1,115 +1,71 @@
-# generate.py
 import torch
-import pickle
 from model import CondTransformer
 from miditok import REMI
-from pathlib import Path
+import pickle
 
+# ---------- 參數 ----------
+CKPT_PATH = "best_model.pt"
+TOKENIZER_PATH = "tokenizer.json"
+EMO2IDX_PATH = "emo2idx.pkl"
+GEN2IDX_PATH = "gen2idx.pkl"
+OUTPUT_PATH = "generated_output.mid"
+MAX_LEN = 512
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+BOS_TOKEN = 1   # 通常 BOS 是 1
+EOS_TOKEN = 2   # 通常 EOS 是 2
+TEMPERATURE = 1.2  # 可以嘗試 1.0 ~ 1.5 看效果
 
-# ------------------------
-# 設定路徑與參數
-# ------------------------
-CKPT_PATH      = 'checkpoints/epoch10.pt' # 根據epoch數更改
-EMO_PKL        = 'emo2idx.pkl'
-GEN_PKL        = 'gen2idx.pkl'
-TOKENIZER_JSON = "tokenizer.json"
-OUTPUT_MIDI    = 'generated.mid'
-
-SOS_TOKEN = 1  # <SOS> token id，請根據 tokenizer/vocab 設定
-EOS_TOKEN = 2  # <EOS> token id，請根據 tokenizer/vocab 設定
-MAX_LEN   = 512 # 要跟train.py一樣
-TOP_K     = 4
-
-# ------------------------
-# 載入標籤對應 & tokenizer
-# ------------------------
-with open(EMO_PKL, 'rb') as f:
-    emo2idx = pickle.load(f)
-with open(GEN_PKL, 'rb') as f:
-    gen2idx = pickle.load(f)
-
-tokenizer = REMI(params=TOKENIZER_JSON) if TOKENIZER_JSON else REMI()
+# ---------- 載入資源 ----------
+tokenizer = REMI(params=TOKENIZER_PATH)
 VOCAB_SIZE = tokenizer.vocab_size
 
-# ------------------------
-# 載入模型
-# ------------------------
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+with open(EMO2IDX_PATH, "rb") as f:
+    emo2idx = pickle.load(f)
+with open(GEN2IDX_PATH, "rb") as f:
+    gen2idx = pickle.load(f)
+
+# ---------- 載入模型 ----------
 model = CondTransformer(
     vocab_size=VOCAB_SIZE,
     emo_num=len(emo2idx),
     gen_num=len(gen2idx),
     d_model=256,
+    nlayers=6,
     nhead=8,
-    nlayers=4,
     max_seq_len=MAX_LEN
-).to(device)
-model.load_state_dict(torch.load(CKPT_PATH, map_location=device))
+).to(DEVICE)
+model.load_state_dict(torch.load(CKPT_PATH, map_location=DEVICE))
 model.eval()
 
-# ------------------------
-# 條件生成函數
-# ------------------------
-@torch.no_grad()
-def generate(model, tokenizer, emotion_idx, genre_idx, max_len=256, sos_token=1, eos_token=2, device='cpu', top_k=4):
-    tokens = [sos_token]
-    for _ in range(max_len):
-        input_tokens = torch.tensor([tokens], dtype=torch.long, device=device)
-        emo = torch.tensor([emotion_idx], dtype=torch.long, device=device)
-        gen = torch.tensor([genre_idx], dtype=torch.long, device=device)
-        logits = model(input_tokens, emo, gen)  # [1, L, vocab_size]
-        next_token_logits = logits[0, -1]       # [vocab_size]
-        # Top-k sampling
-        topk_vals, topk_indices = torch.topk(next_token_logits, k=min(top_k, VOCAB_SIZE))
-        probs = torch.softmax(topk_vals, dim=-1)
-        next_token = topk_indices[torch.multinomial(probs, 1).item()].item()
-        tokens.append(next_token)
-        if next_token == eos_token:
+# ---------- 輸入條件 ----------
+emotion = "happy"
+genre = "pop"
+emo_idx = emo2idx[emotion]
+gen_idx = gen2idx[genre]
+
+# ---------- 生成 tokens (sampling 版本) ----------
+with torch.no_grad():
+    seq = [BOS_TOKEN]
+    for _ in range(MAX_LEN - 1):
+        x = torch.tensor([seq], dtype=torch.long, device=DEVICE)
+        emo_t = torch.tensor([emo_idx], dtype=torch.long, device=DEVICE)
+        gen_t = torch.tensor([gen_idx], dtype=torch.long, device=DEVICE)
+        logits = model(x, emo_t, gen_t)  # [1, L, vocab]
+        logits = logits[0, -1] / TEMPERATURE
+        probs = torch.softmax(logits, dim=-1)
+        next_token = torch.multinomial(probs, 1).item()
+        seq.append(next_token)
+        if next_token == EOS_TOKEN:
             break
-    return tokens
 
-# ------------------------
-# tokens 轉 MIDI
-# ------------------------
-def tokens_to_midi(tokenizer, tokens, output_path):
-    # 建立 TokenSequence 給 miditok
-    tokens = [t for t in tokens if t != 0]
-    if tokens and tokens[0] == 1:  # BOS
-        tokens = tokens[1:]
-    midi = tokenizer([tokens])  # miditok v3.x：tokenizer() 會自動處理 list/int list
-    midi.dump_midi(Path(output_path))
+print(f"生成完成，token 長度：{len(seq)}")
+for tid in seq:
+    if tid not in tokenizer.vocab.values():
+        print(f"非法 token: {tid}")
+    else:
+        print(tokenizer[tid])
 
-# ------------------------
-# 主程式：輸入條件與生成
-# ------------------------
-if __name__ == '__main__':
-    # 你可以改成命令列參數，這裡直接寫死
-    user_emo = 'happy'
-    user_gen = 'pop'
-    output_path = OUTPUT_MIDI
-
-    # 找對應 index
-    emotion_idx = emo2idx[user_emo]
-    genre_idx = gen2idx[user_gen]
-
-    gen_tokens = generate(
-        model, tokenizer, emotion_idx, genre_idx,
-        max_len=MAX_LEN, sos_token=SOS_TOKEN, eos_token=EOS_TOKEN,
-        device=device, top_k=TOP_K
-    )
-
-    print('生成完成，token 長度：', len(gen_tokens))
-
-
-    #debugging
-    print("tokenizer.vocab:", tokenizer.vocab)
-
-    print(tokenizer.special_tokens)
-
-    print("Generated tokens:", gen_tokens)
-    print("Max token id:", max(gen_tokens))
-    print("Min token id:", min(gen_tokens))
-    print("Vocab size:", tokenizer.vocab_size)
-
-    tokens_to_midi(tokenizer, gen_tokens, output_path)
-    print('MIDI 已儲存：', output_path)
+# ---------- tokens 還原成 MIDI ----------
+midi = tokenizer(seq)
+midi.dump_midi(OUTPUT_PATH)
+print(f"已儲存為 {OUTPUT_PATH}")
