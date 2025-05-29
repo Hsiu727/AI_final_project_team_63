@@ -2,7 +2,7 @@ import os
 import pickle
 from miditok import REMI, TokenizerConfig
 
-data_dir = "large"
+data_dir = "midi_genre_classifier\data"
 
 TOKENIZER_PARAMS = {
     "use_programs": True,
@@ -69,15 +69,15 @@ for fname in os.listdir(data_dir):
 
 
 # # 儲存資料與標籤對應
-# with open("dataset_fullband.pkl", "wb") as f:
-#     pickle.dump(dataset, f)
-# with open("emo2idx.pkl", "wb") as f:
-#     pickle.dump(emo2idx, f)
-# with open("gen2idx.pkl", "wb") as f:
-#     pickle.dump(gen2idx, f)
+with open("dataset_fullband.pkl", "wb") as f:
+    pickle.dump(dataset, f)
+with open("emo2idx.pkl", "wb") as f:
+    pickle.dump(emo2idx, f)
+with open("gen2idx.pkl", "wb") as f:
+    pickle.dump(gen2idx, f)
 
 # # 儲存 tokenizer config
-# tokenizer.save_params("tokenizer.json")
+tokenizer.save_params("tokenizer.json")
 
 # for tid in tokens[:2000]:
 #     print(tokenizer[tid])

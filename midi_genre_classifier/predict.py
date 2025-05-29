@@ -41,5 +41,5 @@ def predict_emotion_genre_prob(filepath, model_path="midi_multitask_cnn_final.pt
         return idx2emotion[top_emo], idx2genre[top_gen], prob_emo, prob_gen
 
 if __name__ == '__main__':
-    path = "data/a.midi"  # 替換為你要預測的檔案
+    path = "data/generated_output.mid"  # 替換為你要預測的檔案
     predict_emotion_genre_prob(path)

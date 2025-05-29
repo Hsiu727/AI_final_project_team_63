@@ -11,9 +11,10 @@ GEN2IDX_PATH = "gen2idx.pkl"
 OUTPUT_PATH = "generated_output.mid"
 MAX_LEN = 512
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-BOS_TOKEN = 1   # 通常 BOS 是 1
-EOS_TOKEN = 2   # 通常 EOS 是 2
-TEMPERATURE = 1.2  # 可以嘗試 1.0 ~ 1.5 看效果
+BOS_TOKEN = 1
+EOS_TOKEN = 2
+PAD_TOKEN = 0
+TEMPERATURE = 1.2
 
 # ---------- 載入資源 ----------
 tokenizer = REMI(params=TOKENIZER_PATH)
@@ -39,11 +40,15 @@ model.eval()
 
 # ---------- 輸入條件 ----------
 emotion = "happy"
-genre = "pop"
+genre = "country"
+if emotion not in emo2idx:
+    raise ValueError(f"emotion '{emotion}' 不在 emo2idx!")
+if genre not in gen2idx:
+    raise ValueError(f"genre '{genre}' 不在 gen2idx!")
 emo_idx = emo2idx[emotion]
 gen_idx = gen2idx[genre]
 
-# ---------- 生成 tokens (sampling 版本) ----------
+# ---------- 生成 tokens ----------
 with torch.no_grad():
     seq = [BOS_TOKEN]
     for _ in range(MAX_LEN - 1):
@@ -52,6 +57,11 @@ with torch.no_grad():
         gen_t = torch.tensor([gen_idx], dtype=torch.long, device=DEVICE)
         logits = model(x, emo_t, gen_t)  # [1, L, vocab]
         logits = logits[0, -1] / TEMPERATURE
+
+        # 避免 sampling 到 PAD/BOS
+        logits[PAD_TOKEN] = float('-inf')
+        logits[BOS_TOKEN] = float('-inf')
+
         probs = torch.softmax(logits, dim=-1)
         next_token = torch.multinomial(probs, 1).item()
         seq.append(next_token)
@@ -60,7 +70,7 @@ with torch.no_grad():
 
 print(f"生成完成，token 長度：{len(seq)}")
 for tid in seq:
-    if tid not in tokenizer.vocab.values():
+    if tid < 0 or tid >= VOCAB_SIZE:
         print(f"非法 token: {tid}")
     else:
         print(tokenizer[tid])
