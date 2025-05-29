@@ -5,9 +5,7 @@ pip install pickle miditok torch tqdm pathlib
 
 1. In "preprocess.py", specify the dataset folder (and other parameters like tokenizers if needed) and the saving file name. Run "preprocess.py."
 2. In "train.py", set parameters like EPOCHS, BATCH_SIZE, MAX_LEN(of music tokens)..., and run "train.py."
-3. In "generate.py", choose the checkpoints:
-   CKPT_PATH      = 'checkpoints/epochX.pt', where X is your epochs. 
-   Then, at the bottom, specify the emotion/genre you want, and run "generate.py."
+3. In "generate.py", at the bottom, specify the emotion/genre you want, and run "generate.py."
 
 # MIDI Genre & Emotion Classifier
 
