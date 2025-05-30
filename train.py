@@ -7,6 +7,8 @@ from model import CondTransformer
 from dataset import FullBandMusicDataset
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
+from torch.optim.lr_scheduler import OneCycleLR
+from torch.cuda.amp import autocast, GradScaler
 
 # ----- 參數設定 -----
 DATASET_PATH = "dataset_fullband.pkl"
@@ -15,7 +17,7 @@ GEN2IDX_PATH = "gen2idx.pkl"
 TOKENIZER_PATH = "tokenizer.json"
 BATCH_SIZE = 64
 EPOCHS = 50
-MAX_LEN = 512
+MAX_LEN = 1024
 PAD_TOKEN = 0
 LEARNING_RATE = 1e-4
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -29,14 +31,14 @@ tokenizer = REMI(params=TOKENIZER_PATH)
 VOCAB_SIZE = tokenizer.vocab_size
 
 # ----- 載入 & 切分資料 -----
-with open(DATASET_PATH, "rb") as f:
-    all_data = pickle.load(f)
+# with open(DATASET_PATH, "rb") as f:
+#     all_data = pickle.load(f)
 
-train_data, val_data = train_test_split(all_data, test_size=VAL_RATIO, random_state=42)
-with open("train_split.pkl", "wb") as f:
-    pickle.dump(train_data, f)
-with open("val_split.pkl", "wb") as f:
-    pickle.dump(val_data, f)
+# train_data, val_data = train_test_split(all_data, test_size=VAL_RATIO, random_state=42)
+# with open("train_split.pkl", "wb") as f:
+#     pickle.dump(train_data, f)
+# with open("val_split.pkl", "wb") as f:
+#     pickle.dump(val_data, f)
 
 # ----- 資料集與 DataLoader -----
 train_dataset = FullBandMusicDataset("train_split.pkl", EMO2IDX_PATH, GEN2IDX_PATH, max_len=MAX_LEN, pad_token=PAD_TOKEN)
@@ -58,15 +60,21 @@ with open(GEN2IDX_PATH, "rb") as f:
 
 model = CondTransformer(
     vocab_size=VOCAB_SIZE,
-    d_model=256,
-    nlayers=6,
-    nhead=8,
+    d_model=512,
+    nlayers=12,
+    nhead=16,
     emo_num=len(emo2idx),
     gen_num=len(gen2idx),
     max_seq_len=MAX_LEN,
 ).to(DEVICE)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+scheduler = OneCycleLR(
+    optimizer, 
+    max_lr=LEARNING_RATE, 
+    steps_per_epoch=len(train_loader), 
+    epochs=EPOCHS
+)
 criterion = nn.CrossEntropyLoss(ignore_index=PAD_TOKEN)
 
 # ----- accuracy 計算函數 -----
@@ -110,11 +118,14 @@ if os.path.exists(FULL_CKPT_PATH):
     checkpoint = torch.load(FULL_CKPT_PATH, map_location=DEVICE)
     model.load_state_dict(checkpoint["model"])
     optimizer.load_state_dict(checkpoint["optimizer"])
+    scheduler.load_state_dict(checkpoint["scheduler"])
     start_epoch = checkpoint["epoch"] + 1
     best_val_loss = checkpoint["best_val_loss"]
     print(f"Resumed at epoch {start_epoch}, best_val_loss={best_val_loss:.4f}")
 else:
     print("Train from scratch")
+
+scaler = GradScaler() 
 
 # ----- 訓練迴圈 -----
 for epoch in range(start_epoch, EPOCHS + 1):
@@ -129,17 +140,20 @@ for epoch in range(start_epoch, EPOCHS + 1):
         gens = gens.to(DEVICE)
         inputs = tokens[:, :-1]
         targets = tokens[:, 1:]
-        logits = model(inputs, emos, gens)
-        loss = criterion(logits.reshape(-1, VOCAB_SIZE), targets.reshape(-1))
+        with autocast():
+            logits = model(inputs, emos, gens)
+            loss = criterion(logits.reshape(-1, VOCAB_SIZE), targets.reshape(-1))
         optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+        scheduler.step()
         total_loss += loss.item()
         acc = compute_accuracy(logits, targets, PAD_TOKEN)
         batch_size = tokens.size(0)
         total_acc += acc * batch_size
         total_count += batch_size
-        pbar.set_postfix(loss=loss.item(), acc=acc)
+        pbar.set_postfix(loss=loss.item(), acc=acc, lr=scheduler.get_last_lr()[0])
 
     avg_train_loss = total_loss / len(train_loader)
     avg_train_acc = total_acc / total_count
@@ -158,6 +172,7 @@ for epoch in range(start_epoch, EPOCHS + 1):
     torch.save({
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
+        "scheduler": scheduler.state_dict(),
         "epoch": epoch,
         "best_val_loss": best_val_loss
     }, FULL_CKPT_PATH)

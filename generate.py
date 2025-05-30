@@ -9,7 +9,7 @@ TOKENIZER_PATH = "tokenizer.json"
 EMO2IDX_PATH = "emo2idx.pkl"
 GEN2IDX_PATH = "gen2idx.pkl"
 OUTPUT_PATH = "generated_output.mid"
-MAX_LEN = 512
+MAX_LEN = 1024
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BOS_TOKEN = 1
 EOS_TOKEN = 2
@@ -28,19 +28,19 @@ with open(GEN2IDX_PATH, "rb") as f:
 # ---------- 載入模型 ----------
 model = CondTransformer(
     vocab_size=VOCAB_SIZE,
+    d_model=512,
+    nlayers=12,
+    nhead=16,
     emo_num=len(emo2idx),
     gen_num=len(gen2idx),
-    d_model=256,
-    nlayers=6,
-    nhead=8,
-    max_seq_len=MAX_LEN
+    max_seq_len=MAX_LEN,
 ).to(DEVICE)
 model.load_state_dict(torch.load(CKPT_PATH, map_location=DEVICE))
 model.eval()
 
 # ---------- 輸入條件 ----------
-emotion = "happy"
-genre = "country"
+emotion = "angry"
+genre = "rock"
 if emotion not in emo2idx:
     raise ValueError(f"emotion '{emotion}' 不在 emo2idx!")
 if genre not in gen2idx:
@@ -73,7 +73,8 @@ for tid in seq:
     if tid < 0 or tid >= VOCAB_SIZE:
         print(f"非法 token: {tid}")
     else:
-        print(tokenizer[tid])
+        continue
+#         print(tokenizer[tid])
 
 # ---------- tokens 還原成 MIDI ----------
 midi = tokenizer(seq)
