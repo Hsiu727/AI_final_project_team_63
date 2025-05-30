@@ -7,6 +7,12 @@ pip install pickle miditok torch tqdm pathlib
 2. In "train.py", set parameters like EPOCHS, BATCH_SIZE, MAX_LEN(of music tokens)..., and run "train.py."
 3. In "generate.py", at the bottom, specify the emotion/genre you want, and run "generate.py."
 
+Due to GitHub’s file size limit (100 MB), the pre-trained model weights (.pt file) are not included directly in this repository.
+You can download the latest pre-trained checkpoint from Google Drive:
+https://drive.google.com/file/d/14Rh36449k1q-GCYr6y2LQcO_slwkMd4U/view?usp=sharing
+
+After downloading, please place the file in your directory (next to train.py)
+
 # MIDI Genre & Emotion Classifier
 
 This is a submodule of the Interactive Music Composition, providing automatic genre and emotion classification for MIDI music files.
