@@ -2,7 +2,7 @@ import os
 import pickle
 from miditok import REMI, TokenizerConfig
 
-data_dir = "midi_genre_classifier\data"
+data_dir = "data"
 
 TOKENIZER_PARAMS = {
     "use_programs": True,
