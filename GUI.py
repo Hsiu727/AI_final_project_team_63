@@ -1,98 +1,107 @@
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-import pygame
+from tkinter import ttk, messagebox
 import threading
+import os
+import pygame
+import pickle
 
-# 初始化 pygame mixer
-pygame.mixer.init()
+# --- 讀取 labels ---
+from generate import get_label_list, generate_music
 
-class MusicGeneratorApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("互動式音樂生成器")
-        self.root.geometry("600x300")
-        
-        # 風格、情緒、類型選項
-        self.styles = ["Jazz", "Pop", "Classical", "Rock"]
-        self.emotions = ["Happy", "Sad", "Calm", "Energetic"]
-        self.types = ["Melody", "Accompaniment", "Full Track"]
+EMO2IDX_PATH = "emo2idx.pkl"
+GEN2IDX_PATH = "gen2idx.pkl"
+emotion_list = get_label_list(EMO2IDX_PATH)
+genre_list = get_label_list(GEN2IDX_PATH)
 
-        # 建立下拉選單
-        ttk.Label(root, text="風格：").grid(column=0, row=0, padx=10, pady=10, sticky="W")
-        self.style_cb = ttk.Combobox(root, values=self.styles, state="readonly")
-        self.style_cb.grid(column=1, row=0, padx=10, pady=10)
-        self.style_cb.current(0)
+class MusicGenGUI(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("AI Music Generator")
+        self.geometry("380x300")
+        self.resizable(False, False)
 
-        ttk.Label(root, text="情緒：").grid(column=0, row=1, padx=10, pady=10, sticky="W")
-        self.emotion_cb = ttk.Combobox(root, values=self.emotions, state="readonly")
-        self.emotion_cb.grid(column=1, row=1, padx=10, pady=10)
+        # 標籤選單
+        self.lbl1 = tk.Label(self, text="Emotion:")
+        self.lbl1.pack(pady=(24,0))
+        self.emotion_cb = ttk.Combobox(self, values=emotion_list, state="readonly")
         self.emotion_cb.current(0)
+        self.emotion_cb.pack()
 
-        ttk.Label(root, text="類型：").grid(column=0, row=2, padx=10, pady=10, sticky="W")
-        self.type_cb = ttk.Combobox(root, values=self.types, state="readonly")
-        self.type_cb.grid(column=1, row=2, padx=10, pady=10)
-        self.type_cb.current(0)
+        self.lbl2 = tk.Label(self, text="Genre:")
+        self.lbl2.pack(pady=(8,0))
+        self.genre_cb = ttk.Combobox(self, values=genre_list, state="readonly")
+        self.genre_cb.current(0)
+        self.genre_cb.pack()
 
         # 生成按鈕
-        self.generate_btn = ttk.Button(root, text="生成", command=self.generate_music)
-        self.generate_btn.grid(column=0, row=3, columnspan=2, pady=20)
+        self.gen_btn = tk.Button(self, text="Generate", width=16, command=self.async_generate)
+        self.gen_btn.pack(pady=20)
 
-        # 音樂播放器區域
-        self.player_frame = ttk.LabelFrame(root, text="播放器")
-        self.player_frame.grid(column=2, row=0, rowspan=4, padx=20, pady=10, sticky="NSEW")
+        # 狀態訊息
+        self.status_label = tk.Label(self, text="", fg="blue")
+        self.status_label.pack()
 
-        self.play_btn = ttk.Button(self.player_frame, text="播放", command=self.play_music, state="disabled")
-        self.play_btn.grid(column=0, row=0, padx=10, pady=10)
-        self.pause_btn = ttk.Button(self.player_frame, text="暫停", command=self.pause_music, state="disabled")
-        self.pause_btn.grid(column=1, row=0, padx=10, pady=10)
-
-        self.status_label = ttk.Label(self.player_frame, text="尚未生成音樂")
-        self.status_label.grid(column=0, row=1, columnspan=2, pady=10)
-
-        # 儲存生成檔案路徑
+        # 播放相關
+        self.play_btn = tk.Button(self, text="Play", command=self.play_music, state="disabled")
+        self.play_btn.pack(side="left", padx=30, pady=10)
+        self.pause_btn = tk.Button(self, text="Pause", command=self.pause_music, state="disabled")
+        self.pause_btn.pack(side="right", padx=30, pady=10)
         self.generated_file = None
-        self.is_paused = False
+        self.music_paused = False
+
+        # 初始化 pygame
+        pygame.mixer.init()
+
+    def async_generate(self):
+        self.gen_btn.config(state="disabled")
+        self.status_label.config(text="Generating...")
+        self.play_btn.config(state="disabled")
+        self.pause_btn.config(state="disabled")
+        t = threading.Thread(target=self.generate_music)
+        t.start()
 
     def generate_music(self):
-        style = self.style_cb.get()
         emotion = self.emotion_cb.get()
-        mtype = self.type_cb.get()
-        # 這裡放入呼叫後端模型生成音樂的程式碼
-        # 目前以手動選檔模擬
-        path = filedialog.askopenfilename(title="選擇生成的音樂檔案", filetypes=[("MIDI files", "*.mid *.midi"), ("Audio files", "*.mp3 *.wav")])
-        if not path:
-            return
-        self.generated_file = path
-        self.status_label.config(text=f"已選擇：{path.split('/')[-1]}")
-        self.play_btn.config(state="normal")
-        self.pause_btn.config(state="disabled")
+        genre = self.genre_cb.get()
+        out_path = "gui_generated.mid"
+        try:
+            generate_music(emotion, genre, output_path=out_path)
+            self.generated_file = out_path
+            self.status_label.config(text=f"Generated: {out_path}")
+            self.play_btn.config(state="normal")
+            self.pause_btn.config(state="disabled")
+        except Exception as e:
+            messagebox.showerror("Generation Error", str(e))
+            self.status_label.config(text="Generation failed.")
+        finally:
+            self.gen_btn.config(state="normal")
 
     def play_music(self):
-        if not self.generated_file:
-            return
-        try:
-            pygame.mixer.music.load(self.generated_file)
-            pygame.mixer.music.play()
-            self.is_paused = False
-            self.play_btn.config(state="disabled")
-            self.pause_btn.config(state="normal")
-            self.status_label.config(text="播放中")
-        except Exception as e:
-            messagebox.showerror("播放錯誤", str(e))
+        if self.generated_file and os.path.exists(self.generated_file):
+            try:
+                pygame.mixer.music.load(self.generated_file)
+                pygame.mixer.music.play()
+                self.status_label.config(text=f"Playing: {self.generated_file}")
+                self.play_btn.config(state="disabled")
+                self.pause_btn.config(state="normal")
+            except Exception as e:
+                messagebox.showerror("Play Error", str(e))
+        else:
+            messagebox.showerror("Play Error", "No generated MIDI file.")
 
     def pause_music(self):
-        if not self.is_paused:
-            pygame.mixer.music.pause()
-            self.is_paused = True
-            self.pause_btn.config(text="繼續")
-            self.status_label.config(text="已暫停")
-        else:
-            pygame.mixer.music.unpause()
-            self.is_paused = False
-            self.pause_btn.config(text="暫停")
-            self.status_label.config(text="播放中")
+        if pygame.mixer.music.get_busy():
+            if not self.music_paused:
+                pygame.mixer.music.pause()
+                self.music_paused = True
+                self.status_label.config(text="Paused.")
+                self.pause_btn.config(text="Resume")
+            else:
+                pygame.mixer.music.unpause()
+                self.music_paused = False
+                self.status_label.config(text=f"Playing: {self.generated_file}")
+                self.pause_btn.config(text="Pause")
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = MusicGeneratorApp(root)
-    root.mainloop()
+    app = MusicGenGUI()
+    app.mainloop()
