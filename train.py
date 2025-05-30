@@ -14,12 +14,13 @@ EMO2IDX_PATH = "emo2idx.pkl"
 GEN2IDX_PATH = "gen2idx.pkl"
 TOKENIZER_PATH = "tokenizer.json"
 BATCH_SIZE = 64
-EPOCHS = 30
+EPOCHS = 50
 MAX_LEN = 512
 PAD_TOKEN = 0
 LEARNING_RATE = 1e-4
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 CKPT_PATH = "best_model.pt"
+FULL_CKPT_PATH = "full_ckpt.pt"  # Resume檔案
 VAL_RATIO = 0.2
 
 # ----- 載入 tokenizer -----
@@ -27,21 +28,17 @@ from miditok import REMI
 tokenizer = REMI(params=TOKENIZER_PATH)
 VOCAB_SIZE = tokenizer.vocab_size
 
-# ----- 載入 & 切分資料（必須寫檔案！） -----
+# ----- 載入 & 切分資料 -----
 with open(DATASET_PATH, "rb") as f:
     all_data = pickle.load(f)
 
 train_data, val_data = train_test_split(all_data, test_size=VAL_RATIO, random_state=42)
-
-# 把切分後的資料各自寫入新檔
 with open("train_split.pkl", "wb") as f:
     pickle.dump(train_data, f)
 with open("val_split.pkl", "wb") as f:
     pickle.dump(val_data, f)
 
 # ----- 資料集與 DataLoader -----
-from dataset import FullBandMusicDataset
-
 train_dataset = FullBandMusicDataset("train_split.pkl", EMO2IDX_PATH, GEN2IDX_PATH, max_len=MAX_LEN, pad_token=PAD_TOKEN)
 val_dataset = FullBandMusicDataset("val_split.pkl", EMO2IDX_PATH, GEN2IDX_PATH, max_len=MAX_LEN, pad_token=PAD_TOKEN)
 
@@ -72,13 +69,8 @@ model = CondTransformer(
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 criterion = nn.CrossEntropyLoss(ignore_index=PAD_TOKEN)
 
-
 # ----- accuracy 計算函數 -----
 def compute_accuracy(logits, targets, pad_token):
-    """
-    logits: [batch, seq_len-1, vocab_size]
-    targets: [batch, seq_len-1]
-    """
     preds = torch.argmax(logits, dim=-1)           # [batch, seq_len-1]
     mask = (targets != pad_token)                   # [batch, seq_len-1]
     correct = ((preds == targets) & mask).sum().item()
@@ -110,9 +102,22 @@ def evaluate(model, val_loader, criterion, device, pad_token):
     avg_acc = total_acc / total_count
     return avg_loss, avg_acc
 
-# ----- 訓練迴圈 -----
+# ----- Resume 機制 -----
+start_epoch = 1
 best_val_loss = float("inf")
-for epoch in range(1, EPOCHS + 1):
+if os.path.exists(FULL_CKPT_PATH):
+    print(f"Resume from checkpoint: {FULL_CKPT_PATH}")
+    checkpoint = torch.load(FULL_CKPT_PATH, map_location=DEVICE)
+    model.load_state_dict(checkpoint["model"])
+    optimizer.load_state_dict(checkpoint["optimizer"])
+    start_epoch = checkpoint["epoch"] + 1
+    best_val_loss = checkpoint["best_val_loss"]
+    print(f"Resumed at epoch {start_epoch}, best_val_loss={best_val_loss:.4f}")
+else:
+    print("Train from scratch")
+
+# ----- 訓練迴圈 -----
+for epoch in range(start_epoch, EPOCHS + 1):
     model.train()
     total_acc = 0
     total_loss = 0
@@ -149,3 +154,10 @@ for epoch in range(1, EPOCHS + 1):
         best_val_loss = val_loss
         torch.save(model.state_dict(), CKPT_PATH)
         print(f"  (Saved new best model to {CKPT_PATH})")
+    # 每個 epoch 存 full checkpoint
+    torch.save({
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+        "epoch": epoch,
+        "best_val_loss": best_val_loss
+    }, FULL_CKPT_PATH)
