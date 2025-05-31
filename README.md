@@ -34,12 +34,21 @@ pip install -r requirements.txt
 - **To generate music**  
 
 1. The trained model **"best_model.py"**, the tokenizer **"tokenizer.json"**, the emotion and genre index files **"emo2idx.pkl"**, and **"gen2idx.pkl"** should be in the same directory as GUI.py and generate.py.
+You can use the pre-trained ones, or refer to **To train the model** in the next section.
 2. Open GUI.py to select emotion/genre. Press "generate" and wait for about 3 minutes(may change with different MAX_LEN) for it to generate.
 3. Finally, you can press "play" ot use the built-in player in the GUI to play the MIDI file. The output MIDI file will also apppear in the same directory as generate.py.
 
 - **To train the model**
 1. In "preprocess.py", specify the dataset folder (and other parameters like tokenizers if needed) and the saving file name. The dataset is expected to be of the format of XMIDI_{emotion}_{genre}. The code in   preprocess.py needs to be modified if another dataset is used. Run "preprocess.py."
+```
+python preprocess.py
+```
+After this, the tokenizer **"tokenizer.json"**, the emotion and genre index files **"emo2idx.pkl"**, and **"gen2idx.pkl"** would appear in the same folder.
 2. In "train.py", set parameters like EPOCHS, BATCH_SIZE, MAX_LEN(of music tokens)..., and run "train.py."
+```
+python train.py
+```
+After the process,  The trained model **"best_model.py"** would appear in the same folder.
 
 ## Hyperparameters
 
