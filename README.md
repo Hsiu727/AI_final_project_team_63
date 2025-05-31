@@ -53,7 +53,7 @@ python GUI.py
 ```
 python preprocess.py
 ```
-After this, the tokenizer **"tokenizer.json"**, the emotion and genre index files **"emo2idx.pkl"**, and **"gen2idx.pkl"** would appear in the same folder.
+After this, the tokenizer **"tokenizer.json"**, the emotion and genre index files **"emo2idx.pkl"**, and **"gen2idx.pkl"** would appear in the same folder.  
 2. In "train.py", set parameters like EPOCHS, BATCH_SIZE, MAX_LEN(of music tokens)..., and run "train.py."
 ```
 python train.py
