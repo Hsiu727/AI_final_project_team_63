@@ -31,11 +31,21 @@ pip install -r requirements.txt
 
 ## Usage
 
+Download and install packages
+```
+git clone https://github.com/Hsiu727/AI_final_project_team_63.git
+cd AI_final_project_team_63
+pip install -r requirements.txt
+```
+
 - **To generate music**  
 
-1. The trained model **"best_model.py"**, the tokenizer **"tokenizer.json"**, the emotion and genre index files **"emo2idx.pkl"**, and **"gen2idx.pkl"** should be in the same directory as GUI.py and generate.py.
-You can use the pre-trained ones, or refer to **To train the model** in the next section.
+1. The trained model **"best_model.py"**, the tokenizer **"tokenizer.json"**, the emotion and genre index files **"emo2idx.pkl"**, and **"gen2idx.pkl"** should be in the same directory as GUI.py and generate.py.  
+You can use the pre-trained ones, or refer to **To train the model** in the next section to train your own.
 2. Open GUI.py to select emotion/genre. Press "generate" and wait for about 3 minutes(may change with different MAX_LEN) for it to generate.
+```
+python GUI.py
+```  
 3. Finally, you can press "play" ot use the built-in player in the GUI to play the MIDI file. The output MIDI file will also apppear in the same directory as generate.py.
 
 - **To train the model**
