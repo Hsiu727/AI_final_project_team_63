@@ -66,7 +66,7 @@ For training:
 ```
 BATCH_SIZE = 64
 EPOCHS = 50
-MAX_LEN = 1024
+MAX_LEN = 1024 # The numdber of music tokens generated
 LEARNING_RATE = 1e-4
 VAL_RATIO = 0.2
 ```
@@ -79,7 +79,7 @@ nhead=16,
 
 ...
 
-max_seq_len=1024 # The numdber of music tokens generated
+max_seq_len=1024 # Must be the same as MAX_LEN used in training 
 ```
 
 ## Experiment Results
