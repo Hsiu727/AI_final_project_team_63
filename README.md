@@ -15,6 +15,7 @@ After downloading, please place the file in your directory (next to generate.py)
 
 
 ## Prerequisite
+
 - Coding Environment:
   
   - OS: Windows 11
@@ -29,6 +30,7 @@ pip install -r requirements.txt
 ```
 
 ## Usage
+
 - **To generate music**  
 
 1. The trained model **"best_model.py"**, the tokenizer **"tokenizer.json"**, the emotion and genre index files **"emo2idx.pkl"**, and **"gen2idx.pkl"** should be in the same directory as GUI.py and generate.py.
@@ -39,5 +41,28 @@ pip install -r requirements.txt
 1. In "preprocess.py", specify the dataset folder (and other parameters like tokenizers if needed) and the saving file name. The dataset is expected to be of the format of XMIDI_{emotion}_{genre}. The code in   preprocess.py needs to be modified if another dataset is used. Run "preprocess.py."
 2. In "train.py", set parameters like EPOCHS, BATCH_SIZE, MAX_LEN(of music tokens)..., and run "train.py."
 
-## Hyperparameters we set
+## Hyperparameters
+
+For training:
+```
+BATCH_SIZE = 64
+EPOCHS = 50
+MAX_LEN = 1024
+LEARNING_RATE = 1e-4
+VAL_RATIO = 0.2
+```
+
+For the model: 
+```
+d_model=512,
+nlayers=12,
+nhead=16,
+
+...
+
+max_seq_len=1024 # The numdber of music tokens generated
+```
+
+## Experiment Results
+
 TODO
