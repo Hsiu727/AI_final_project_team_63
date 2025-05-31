@@ -1,84 +1,43 @@
 # AI_final_project_team_63
 
-# Transformer
-pip install pickle miditok torch tqdm pathlib
+## Overview
 
-1. In "preprocess.py", specify the dataset folder (and other parameters like tokenizers if needed) and the saving file name. Run "preprocess.py."
-2. In "train.py", set parameters like EPOCHS, BATCH_SIZE, MAX_LEN(of music tokens)..., and run "train.py."
-3. In "generate.py", at the bottom, specify the emotion/genre you want, and run "generate.py."
+A **transformer** model designed to generate music, after given input of (Genre, Emotion). The output music file would be a MIDI file. Refer to [Usage](#usage) on how to use the files to generate music.
+
+Some sample output music(MIDI files, and also the converted to mp3 versions) are also included in the sample_outputs folder to showcase what the generated music would look like.
+
+The pretrained model is trained with the dataset [XMIDI Dataset](https://github.com/xmusic-project/XMIDI_Dataset).  
 
 Due to GitHub’s file size limit (100 MB), the pre-trained model weights (.pt file) are not included directly in this repository.
-You can download the latest pre-trained checkpoint from Google Drive:
-https://drive.google.com/file/d/14Rh36449k1q-GCYr6y2LQcO_slwkMd4U/view?usp=sharing
+You can download the latest pre-trained checkpoint from [Google Drive](https://drive.google.com/file/d/14Rh36449k1q-GCYr6y2LQcO_slwkMd4U/view?usp=sharing):
 
-After downloading, please place the file in your directory (next to train.py)
+After downloading, please place the file in your directory (next to generate.py)
 
-# MIDI Genre & Emotion Classifier
 
-This is a submodule of the Interactive Music Composition, providing automatic genre and emotion classification for MIDI music files.
+## Prerequisite
+- Coding Environment:
+  
+  - OS: Windows 11
+  - Python 3.13.2
+    
+- Package Versions:
+  
+Run the following command to install the required packages:
 
-## What is this?
-
-The MIDI classifier takes a `.midi` file and predicts both its **genre** and **emotion** using a lightweight CNN-based deep learning model.
-
-- **Input**: Single MIDI file (`.midi` or `.mid`)
-- **Output**: Predicted genre and emotion, with probability scores for each class
-
-## How to Train
-
-### 1. Install dependencies
-
-```bash
-cd midi_classifier
+```
 pip install -r requirements.txt
 ```
 
-### 2. Data Preprocessing
-Before training or prediction, you must preprocess your MIDI data to extract features and generate numpy arrays.
+## Usage
+- **To generate music**  
 
-```bash
-python preprocess.py
-```
-- Place your raw MIDI files in the data/ folder (default).
+1. The trained model **"best_model.py"**, the tokenizer **"tokenizer.json"**, the emotion and genre index files **"emo2idx.pkl"**, and **"gen2idx.pkl"** should be in the same directory as GUI.py and generate.py.
+2. Open GUI.py to select emotion/genre. Press "generate" and wait for about 3 minutes(may change with different MAX_LEN) for it to generate.
+3. Finally, you can press "play" ot use the built-in player in the GUI to play the MIDI file. The output MIDI file will also apppear in the same directory as generate.py.
 
-- Preprocessed files will be saved in the preprocessed/ directory (including .npy features and a meta.csv metadata file).
+- **To train the model**
+1. In "preprocess.py", specify the dataset folder (and other parameters like tokenizers if needed) and the saving file name. The dataset is expected to be of the format of XMIDI_{emotion}_{genre}. The code in   preprocess.py needs to be modified if another dataset is used. Run "preprocess.py."
+2. In "train.py", set parameters like EPOCHS, BATCH_SIZE, MAX_LEN(of music tokens)..., and run "train.py."
 
-#### Dataset Format & Label Extraction
-The preprocessing script automatically extracts emotion and genre labels from each MIDI file’s name.
-The expected filename format is:
-```php-template
-XMIDI_<Emotion>_<Genre>_<ID>.midi
-```
-
-### 3. (Optional) Train your own model
-
-By default, you can use the provided pre-trained model.
-To retrain:
-
-```bash
-python train.py
-```
-
-- Place your MIDI files in the data/ folder.
-- Training progress and final model will be saved as midi_multitask_cnn.pt.
-
-### 4. Predict Genre and Emotion
-
-```bash
-python predict.py
-```
-## Integration
-
-Due to GitHub’s file size limit (100 MB), the pre-trained model weights (.pt file) are not included directly in this repository.
-You can download the latest pre-trained checkpoint from Google Drive:
-https://drive.google.com/file/d/1d2n1nMdNuplPc7bI5ftxdrVIXGM9JTzz/view?usp=sharing
-
-After downloading, please place the file in your midi_classifier/ directory (next to train.py) and rename it as ''midi_multitask_cnn_final.pt''.
-
-To call the classifier from another Python module:
-
-```python
-from midi_classifier.predict import predict_emotion_genre_prob
-
-emotion, genre, emotion_probs, genre_probs = predict_emotion_genre_prob("path/to/file.midi")
-```
+## Hyperparameters we set
+TODO
