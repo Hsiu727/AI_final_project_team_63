@@ -88,3 +88,8 @@ max_seq_len=1024 # Must be the same as MAX_LEN used in training
 ![圖二](images/Figure_1.png)
 ![圖三](images/Figure_1.png)
 
+
+## google slides
+
+click the following link to get our google slides：
+https://docs.google.com/presentation/d/e/2PACX-1vRye91epbzfFQgnYlKF1iHZZbxV7mh7DlGTLteW9rpLEs31Ju5p5e9he-P9a962yd7mMfUnjSKN9fRk/pubembed?start=false&loop=false&delayms=3000
