@@ -84,4 +84,7 @@ max_seq_len=1024 # Must be the same as MAX_LEN used in training
 
 ## Experiment Results
 
-TODO
+![圖一](images/Figure_1.png)
+![圖二](images/Figure_1.png)
+![圖三](images/Figure_1.png)
+
