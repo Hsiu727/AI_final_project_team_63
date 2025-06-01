@@ -4,6 +4,10 @@
 
 A **transformer** model designed to generate music, after given input of (Genre, Emotion). The output music file would be a MIDI file. Refer to [Usage](#usage) on how to use the files to generate music.
 
+
+Refer to our [Google Slides](https://docs.google.com/presentation/d/e/2PACX-1vRye91epbzfFQgnYlKF1iHZZbxV7mh7DlGTLteW9rpLEs31Ju5p5e9he-P9a962yd7mMfUnjSKN9fRk/pubembed?start=false&loop=false&delayms=3000) for more thorough introduction  
+
+
 Some sample output music(MIDI files, and also the converted to mp3 versions) are also included in the sample_outputs folder to showcase what the generated music would look like.
 
 The pretrained model is trained with the dataset [XMIDI Dataset](https://github.com/xmusic-project/XMIDI_Dataset).  
@@ -87,9 +91,3 @@ max_seq_len=1024 # Must be the same as MAX_LEN used in training
 ![圖一](images/Figure_1.png)
 ![圖二](images/Figure_1.png)
 ![圖三](images/Figure_1.png)
-
-
-## google slides
-
-click the following link to get our google slides：
-https://docs.google.com/presentation/d/e/2PACX-1vRye91epbzfFQgnYlKF1iHZZbxV7mh7DlGTLteW9rpLEs31Ju5p5e9he-P9a962yd7mMfUnjSKN9fRk/pubembed?start=false&loop=false&delayms=3000
