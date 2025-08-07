@@ -62,3 +62,4 @@ class CondTransformer(nn.Module):
 # Example usage:
 # model = CondTransformer(vocab_size=500, emo_num=5, gen_num=8)
 # logits = model(tokens_batch, emotion_batch, genre_batch)  # [B, L, vocab_size]
+#123
